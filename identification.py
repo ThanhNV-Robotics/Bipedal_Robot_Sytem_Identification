@@ -47,7 +47,7 @@ params_settings = get_param_from_yaml(robot, identif_data)
 print(params_settings)
 
 params_standard_u = robot.get_standard_parameters(params_settings)
-# print(params_standard_u)
+print(params_standard_u)
 
 # Print out the placement of each joint of the kinematic tree
 print("\nJoint placements:")
