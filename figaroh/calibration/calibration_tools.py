@@ -24,13 +24,13 @@ import matplotlib.pyplot as plt
 import numdifftools as nd
 # import quadprog as qp
 import pandas as pd
-from ..tools.regressor import eliminate_non_dynaffect
-from ..tools.qrdecomposition import (
+from figaroh.tools.regressor import eliminate_non_dynaffect
+from figaroh.tools.qrdecomposition import (
     get_baseParams,
     get_baseIndex,
     build_baseRegressor,
     cond_num)
-from ..tools.robot import Robot
+from figaroh.tools.robot import Robot
 
 TOL_QR = 1e-8
 FULL_PARAMTPL = [

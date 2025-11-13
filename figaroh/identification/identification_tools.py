@@ -15,7 +15,7 @@
 import pinocchio as pin
 import numpy as np
 from scipy import signal
-from ..tools.regressor import build_regressor_reduced, get_index_eliminate
+from figaroh.tools.regressor import build_regressor_reduced, get_index_eliminate
 import quadprog
 import operator
 

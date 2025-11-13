@@ -1,8 +1,8 @@
 <?xml version="1.0" ?>
 <robot name="left_leg">
-<mujoco>
+<!-- <mujoco>
     <compiler meshdir="meshes/" balanceinertia="true" discardvisual="false"/>
-  </mujoco>
+  </mujoco> -->
   <material name="silver">
     <color rgba="0.700 0.700 0.700 1.000"/>
   </material>
@@ -62,13 +62,9 @@
   </link>
   <link name="Left_Thigh_1">
     <inertial>
-      <!-- CoM 위치: -0.314 mm, 148.871 mm, -387.384 mm  →  m 단위 -->
+
       <origin xyz="-0.000314 -0.013334 -0.166035" rpy="0 0 0"/>
-
-      <!-- 질량: 1867.391 g → kg -->
       <mass value="1.867391"/>
-
-      <!-- 관성 모멘트: (g·mm²)  →  kg·m²  (×10⁻⁹) -->
       <inertia ixx="0.01165"
               ixy="2.6779e-05"
               ixz="-3.2964e-05"
@@ -164,42 +160,46 @@
     </collision>
   </link>
 
-
-  <!-- 왼쪽 다리 -->
-  <joint name="Left_Hip_Pitch" type="continuous">
+  <joint name="left_hip_pitch" type="revolute">
     <origin rpy="0 0 0" xyz="0.0 0.089761 -0.081437"/>
     <parent link="world"/>
     <child link="Left_Hip_Pitch_1"/>
     <axis xyz="-0.0 0.965926 -0.258819"/>
+    <limit lower="-1.57" upper="1.57" effort="48" velocity="10"/>
   </joint>
-  <joint name="Left_Hip_Roll" type="continuous">
+  <joint name="left_hip_roll" type="revolute">
     <origin rpy="0 0 0" xyz="0.0445 0.072444 -0.019412"/>
     <parent link="Left_Hip_Pitch_1"/>
     <child link="Left_Link2_Hip_1"/>
     <axis xyz="1.0 0.0 -0.0"/>
+    <limit lower="-0.785" upper="0.785" effort="48" velocity="10"/>
   </joint>
-  <joint name="Left_Hip_Yaw" type="continuous">
+  <joint name="left_hip_yaw" type="revolute">
     <origin rpy="0 0 0" xyz="-0.0445 0.0 -0.1205"/>
     <parent link="Left_Link2_Hip_1"/>
     <child link="Left_Thigh_1"/>
     <axis xyz="-0.0 0.0 -1.0"/>
+    <limit lower="-0.785" upper="0.785" effort="100" velocity="10"/>
   </joint>
-    <joint name="Left_Knee" type="continuous">
+    <joint name="left_knee" type="revolute">
     <origin rpy="0 0 0" xyz="0.0 0.017 -0.2035"/>
     <parent link="Left_Thigh_1"/>
     <child link="Left_Shank_1"/>
     <axis xyz="-0.0 1.0 0.0"/>
+    <limit lower="0" upper="2.094" effort="100" velocity="10"/>
   </joint>
-  <joint name="Left_Ankle_Roll" type="continuous">
+  <joint name="left_ankle_roll" type="revolute">
     <origin rpy="0 0 0" xyz="0.019 -0.017 -0.335"/>
     <parent link="Left_Shank_1"/>
     <child link="Left_Ankle_Roll_1"/>
     <axis xyz="-1.0 -0.0 0.0"/>
+    <limit lower="-0.349" upper="0.349" effort="12" velocity="10"/>
   </joint>
-  <joint name="Left_Ankle_Pitch" type="continuous">
+  <joint name="left_ankle_pitch" type="revolute">
     <origin xyz="-0.019 -0.015 0.0" rpy="0 0 0"/>
     <parent link="Left_Ankle_Roll_1"/>
     <child link="Left_Foot_1"/>
     <axis xyz="-0.0 1.0 -0.0"/>
+    <limit lower="-0.52" upper="0.5" effort="100" velocity="10"/>
   </joint>
 </robot>

@@ -5,7 +5,7 @@ def get_standard_parameters(model):
     """
     This function returns a dictionary of the standard dynamic parameters of the robot model.
     """
-    phi = []
+    Y = []
     params = []
 
     params_name = (
@@ -40,20 +40,39 @@ def get_standard_parameters(model):
         for j in params_name:
             params.append(j + str(i))
         for k in P_mod:
-            phi.append(k)
-    params_std = dict(zip(params, phi)) # (mi: value, mxi: value, ...)
+            Y.append(k)
+    params_std = dict(zip(params, Y)) # (mi: value, mxi: value, ...)
     return params_std
+
+def get_list_standard_param_symbols (model):
+    param_sysmbols = []
+    params_name = (
+        "m",
+        "mx",
+        "my",
+        "mz",
+        "Ixx",
+        "Ixy",
+        "Ixz",
+        "Iyy",
+        "Iyz",
+        "Izz",
+    )
+    for i in range(1, len(model.inertias)):
+        for j in params_name:
+            param_sysmbols.append(j + str(i))
+    return param_sysmbols
 
 def calculate_standard_regressor (pin_model, pin_data, q_rand, dq_rand, ddq_rand):
     """
     This function calculates the standard regressor matrix of the robot model.
     Equation of motion:
 
-    tau = Phi(q, dq, ddq) * X
+    tau = Y(q, dq, ddq) * X
 
     where:
     tau: joint torques with size = ndof
-    Phi: standard regressor matrix with size = ndof x np
+    Y: standard regressor matrix with size = ndof x np
     np: number of standard parameters = 10n, n is the number of links
     ndof: number of degrees of freedom
     X: vector of the standard parameter = [m1, mx1, my1, mz1, Ixx1, Ixy1, Ixz1, Iyy1, Iyz1, Izz1,...] with size = 10n, n is the number of links
@@ -65,22 +84,48 @@ def calculate_standard_regressor (pin_model, pin_data, q_rand, dq_rand, ddq_rand
     dq_rand: vector of joint velocities
     ddq_rand: vector of joint accelerations
     """
-    nb_samples = q_rand.shape[0]
+    nb_samples = q_rand.shape[0] # q_rand samples are row-stacked
     no_dof = pin_model.nv # number of actuated joints = number of moving bodies
     no_params = 10 * pin_model.nv  # exclude the universe body
 
-    Phi = np.zeros((nb_samples * no_dof, no_params)) # initialize the regressor matrix
-    Phi_model = np.zeros((nb_samples * no_dof, no_params))    
+    Y = np.zeros((nb_samples * no_dof, no_params)) # initialize the regressor matrix
+    for i in range(nb_samples):
+        Y_temp = pin.computeJointTorqueRegressor(pin_model, pin_data, q_rand[i, :], dq_rand[i, :], ddq_rand[i, :])
+        # stack the regressor matrices in row
+        Y[i * no_dof : (i + 1) * no_dof, :] = Y_temp
+    return Y    
+def get_unidentificable_parameter_index (Y, tol = 1e-6):
+    """
+    This function returns the index of unidentifiable parameters in the standard regressor matrix.
+    Y: standard regressor matrix
+    tol: tolerance for identifying unidentifiable parameters
+    """
+    # check each column of Y if its norm is less than tol
+    idx_unidentifiable = []
+    for i in range(Y.shape[1]):
+        if np.linalg.norm(Y[:, i]) < tol:
+            idx_unidentifiable.append(i)
+    return idx_unidentifiable
 
-def calculate_base_parameters (Phi, X, zero_q, zero_qd, zero_qdd, zero_g, no_dof):
+
+def calculate_base_parameters (Y, X, zero_q, zero_qd, zero_qdd, zero_g, no_dof):
     """
     This function calculates the base parameters of the robot model.
-    Phi: standard regressor matrix
+
+    Y: standard regressor matrix
     X: standard parameter vector
     zero_q: bool type, if True, the joint positions are zero
     zero_qd: bool type, if True, the joint velocities are zero
     zero_qdd: bool type, if True, the joint accelerations are zero
     zero_g: bool type, if True, the gravity vector is zero
     no_dof: int, number of degrees of freedom
+
+    returns:
+    Y_base: base regressor matrix
+    X_base: base parameter vector
     """
-    pass # To be implemented
+    # step 1: remove zero columns from Y
+    idx_unidentifiable = get_unidentificable_parameter_index(Y)
+    Y_reduced = np.delete(Y, idx_unidentifiable, axis=1)
+
+    
