@@ -1,5 +1,6 @@
 import pinocchio as pin
 import numpy as np
+from scipy import linalg, signal
 
 def get_standard_parameters(model):
     """
@@ -108,24 +109,46 @@ def get_unidentificable_parameter_index (Y, tol = 1e-6):
     return idx_unidentifiable
 
 
-def calculate_base_parameters (Y, X, zero_q, zero_qd, zero_qdd, zero_g, no_dof):
+def calculate_base_parameters (Y, param_st, TOL_QR=1e-6):
     """
     This function calculates the base parameters of the robot model.
 
     Y: standard regressor matrix
-    X: standard parameter vector
-    zero_q: bool type, if True, the joint positions are zero
-    zero_qd: bool type, if True, the joint velocities are zero
-    zero_qdd: bool type, if True, the joint accelerations are zero
-    zero_g: bool type, if True, the gravity vector is zero
-    no_dof: int, number of degrees of freedom
+    param_st: standard parameter vector
+    TOL_QR: tolerance for QR decomposition
 
     returns:
     Y_base: base regressor matrix
-    X_base: base parameter vector
+    param_base: base parameter vector
     """
     # step 1: remove zero columns from Y
     idx_unidentifiable = get_unidentificable_parameter_index(Y)
-    Y_reduced = np.delete(Y, idx_unidentifiable, axis=1)
+    Y_reduced = np.delete(Y, idx_unidentifiable, axis=1) # remove the 0 columns
+    param_reduce = param_st
+    for idx in idx_unidentifiable:
+        # use pop(index) to remove the parameter at the specific index 
+        param_reduce.pop(idx) # remove the corresponding parameters
+
+    # Perform QR decomposition with column pivoting
+    # p is pivot indices
+    # the permutation matrix P can be constructed as P = np.eye(p.size)[p]
+    # the decomposition equation is:
+    # Y_reduced @ P.T = Q @ R
+    # if Y_reduced is rank deficient, R = [ R1 R2]
+    # where R1 is full rank upper triangular matrix
+    # numerical rank of Y_reduced is determined by checking the diagonal elements of R
+    # if abs(R[i,i]) < TOL_QR, then rank < i
+    Q, R, p = linalg.qr(Y_reduced, pivoting=True)
+    num_rank = min(Y_reduced.shape)
+
+    for i in range(min(R.shape)): # scanning the diagonal elements of R
+        if abs(R[i, i]) < TOL_QR:
+            numerical_rank_Y = i
+            break
+    R1 = R[:numerical_rank_Y, :numerical_rank_Y]
+    Q1 = Q[:, :numerical_rank_Y]
+    R2 = R[:numerical_rank_Y, numerical_rank_Y:]
+
+    return numerical_rank_Y
 
     

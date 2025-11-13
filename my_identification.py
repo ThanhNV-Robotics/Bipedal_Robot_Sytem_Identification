@@ -70,6 +70,8 @@ Y_temp = pin.computeJointTorqueRegressor(model, data, q, v, a)
 W_standard = sysid_helpers.calculate_standard_regressor(model, data, q_rand, dq_rand, ddq_rand)
 print("\nStandard regressor matrix W_standard shape: ", W_standard.shape)
 print(W_standard[0, :])
+
+print("\nRank of the standard regressor matrix W_standard: ")
 print(np.linalg.matrix_rank(W_standard))
 
 # determine 0-columns (unidentificable parameters) in the standard regressor matrix
@@ -85,4 +87,12 @@ for p in unidentificable_params:
 
 # remove 0-columns from the standard regressor matrix
 W_reduced = np.delete(W_standard, unidentificable_idx, axis=1)
+print("deleted columns' indices: ", unidentificable_idx)
+print("\nReduced regressor matrix W_reduced shape: ", W_reduced.shape)
+
+# check numerical rank of W_reduced
+num_rank_W_reduced = sysid_helpers.calculate_base_parameters(W_standard,standard_param_symbols_list, TOL_QR=1e-6)
+print("\nNumerical rank of the reduced regressor matrix W_reduced: ", num_rank_W_reduced)
+
+
 
