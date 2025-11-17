@@ -5,6 +5,8 @@ from scipy import linalg, signal
 def get_standard_parameters(model):
     """
     This function returns a dictionary of the standard dynamic parameters of the robot model.
+    Input: model -> pinocchio model
+    Output: params_std -> dictionary of standard parameters
     """
     Y = []
     params = []
@@ -46,6 +48,11 @@ def get_standard_parameters(model):
     return params_std
 
 def get_list_standard_param_symbols (model):
+    """
+    This function returns a list of standard dynamic parameter symbols of the robot model.
+    Input: model -> pinocchio model
+    Output: param_symbols -> list of standard parameter symbols
+    """
     param_sysmbols = []
     params_name = (
         "m",
@@ -121,6 +128,8 @@ def calculate_base_parameters (Y, param_st, TOL_QR=1e-6):
     Y_base: base regressor matrix
     param_base: base parameter vector
     """
+    machine_eps = np.finfo(float).eps  # Approx. 2.22e-16
+    tolerance = np.sqrt(machine_eps)  # Approx. 1.49e-8
     # step 1: remove zero columns from Y
     idx_unidentifiable = get_unidentificable_parameter_index(Y)
     Y_reduced = np.delete(Y, idx_unidentifiable, axis=1) # remove the 0 columns
@@ -129,7 +138,7 @@ def calculate_base_parameters (Y, param_st, TOL_QR=1e-6):
         # use pop(index) to remove the parameter at the specific index 
         param_reduce.pop(idx) # remove the corresponding parameters
 
-    # Perform QR decomposition with column pivoting
+    # Perform QR decomposition with pivoting
     # p is pivot indices
     # the permutation matrix P can be constructed as P = np.eye(p.size)[p]
     # the decomposition equation is:
@@ -139,8 +148,9 @@ def calculate_base_parameters (Y, param_st, TOL_QR=1e-6):
     # numerical rank of Y_reduced is determined by checking the diagonal elements of R
     # if abs(R[i,i]) < TOL_QR, then rank < i
     Q, R, p = linalg.qr(Y_reduced, pivoting=True)
-    num_rank = min(Y_reduced.shape)
 
+    # Compute numerical rank
+    numerical_rank_Y = min(Y_reduced.shape)
     for i in range(min(R.shape)): # scanning the diagonal elements of R
         if abs(R[i, i]) < TOL_QR:
             numerical_rank_Y = i
@@ -148,6 +158,23 @@ def calculate_base_parameters (Y, param_st, TOL_QR=1e-6):
     R1 = R[:numerical_rank_Y, :numerical_rank_Y]
     Q1 = Q[:, :numerical_rank_Y]
     R2 = R[:numerical_rank_Y, numerical_rank_Y:]
+    P = np.eye(p.size)[p] # permutation matrix
+
+    beta = np.linalg.solve(R1, R2) # beta = R1^{-1} * R2, linear combination coefficient of base parameters
+    beta[np.abs(beta) < np.sqrt(np.finfo(float).eps)] = 0 # check for very small values and set them to zero
+
+    # Check relationship in Y
+    P1 = np.transpose(P)[:, :numerical_rank_Y] # independent part
+    P2 = np.transpose(P)[:, numerical_rank_Y:] # dependent part
+    Y1 = Y_reduced@P1 # independent part 
+    Y2 = Y_reduced@P2 # dependent part
+    Y2_estimated = Y1 @ beta
+    residual = Y2 - Y2_estimated
+    max_residual = np.max(np.abs(residual))
+    if max_residual > 1e-6:
+        print("Warning: High residual in base parameter calculation: ", max_residual)
+    else:
+        print("Max residual in base parameter calculation: ", max_residual)
 
     return numerical_rank_Y
 
