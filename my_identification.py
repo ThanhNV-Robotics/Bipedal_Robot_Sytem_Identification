@@ -91,8 +91,10 @@ print("deleted columns' indices: ", unidentificable_idx)
 print("\nReduced regressor matrix W_reduced shape: ", W_reduced.shape)
 
 # check numerical rank of W_reduced
-num_rank_W_reduced = sysid_helpers.calculate_base_parameters(W_standard,standard_param_symbols_list, TOL_QR=1e-6)
-print("\nNumerical rank of the reduced regressor matrix W_reduced: ", num_rank_W_reduced)
+base_parameters = sysid_helpers.calculate_base_parameters(W_standard,standard_param_symbols_list, TOL_QR=1e-6)
+print("\nBase parameters of the reduced regressor matrix W_reduced: ")
+for param in base_parameters:
+    print(param)
 
 
 

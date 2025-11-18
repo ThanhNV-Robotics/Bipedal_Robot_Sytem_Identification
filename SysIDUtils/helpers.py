@@ -121,7 +121,7 @@ def calculate_base_parameters (Y, param_st, TOL_QR=1e-6):
     This function calculates the base parameters of the robot model.
 
     Y: standard regressor matrix
-    param_st: standard parameter vector
+    param_st: standard parameter vector /full paramter list
     TOL_QR: tolerance for QR decomposition
 
     returns:
@@ -130,13 +130,14 @@ def calculate_base_parameters (Y, param_st, TOL_QR=1e-6):
     """
     machine_eps = np.finfo(float).eps  # Approx. 2.22e-16
     tolerance = np.sqrt(machine_eps)  # Approx. 1.49e-8
+
     # step 1: remove zero columns from Y
     idx_unidentifiable = get_unidentificable_parameter_index(Y)
     Y_reduced = np.delete(Y, idx_unidentifiable, axis=1) # remove the 0 columns
-    param_reduce = param_st
-    for idx in idx_unidentifiable:
+    X = param_st 
+    for idx in idx_unidentifiable: # remove unidentifiable parameters
         # use pop(index) to remove the parameter at the specific index 
-        param_reduce.pop(idx) # remove the corresponding parameters
+        X.pop(idx) # remove the corresponding parameters
 
     # Perform QR decomposition with pivoting
     # p is pivot indices
@@ -155,27 +156,54 @@ def calculate_base_parameters (Y, param_st, TOL_QR=1e-6):
         if abs(R[i, i]) < TOL_QR:
             numerical_rank_Y = i
             break
-    R1 = R[:numerical_rank_Y, :numerical_rank_Y]
+    R1 = R[:numerical_rank_Y, :numerical_rank_Y] # R1 is full rank upper triangular matrix
     Q1 = Q[:, :numerical_rank_Y]
     R2 = R[:numerical_rank_Y, numerical_rank_Y:]
     P = np.eye(p.size)[p] # permutation matrix
 
     beta = np.linalg.solve(R1, R2) # beta = R1^{-1} * R2, linear combination coefficient of base parameters
-    beta[np.abs(beta) < np.sqrt(np.finfo(float).eps)] = 0 # check for very small values and set them to zero
-
-    # Check relationship in Y
-    P1 = np.transpose(P)[:, :numerical_rank_Y] # independent part
-    P2 = np.transpose(P)[:, numerical_rank_Y:] # dependent part
-    Y1 = Y_reduced@P1 # independent part 
-    Y2 = Y_reduced@P2 # dependent part
-    Y2_estimated = Y1 @ beta
+    #beta[np.abs(beta) < np.sqrt(np.finfo(float).eps)] = 0 # check for very small values and set them to zero
+    beta[np.abs(beta) < 1e-8] = 0
+    # Check relationship in regressor matrix Y
+    # we have to transpose P because the relation is:
+    # Y_reduced @ P.T = Q @ R
+    P1_T = np.transpose(P)[:, :numerical_rank_Y] # correspond to independent part
+    P2_T = np.transpose(P)[:, numerical_rank_Y:] # correspond to dependent part
+    Y1 = Y_reduced@P1_T # columns correspond to independent part 
+    Y2 = Y_reduced@P2_T # columns correspond to dependent part
+    Y2_estimated = Y1 @ beta # beta is the coefficient matrix
     residual = Y2 - Y2_estimated
     max_residual = np.max(np.abs(residual))
     if max_residual > 1e-6:
         print("Warning: High residual in base parameter calculation: ", max_residual)
     else:
+        print("Relationship in regressor matrix found")
         print("Max residual in base parameter calculation: ", max_residual)
 
-    return numerical_rank_Y
+    # Find base parameters
+    independent_idx = p[:numerical_rank_Y] # indices of independent parameters in X
+    dependent_idx = p[numerical_rank_Y:] # indices of dependent parameters in X
+    
+    X1 = [] # independent parameters
+    X2 = [] # dependent parameters
+
+    for idx in independent_idx: # get independent parameters
+        X1.append(X[idx])
+    for idx in dependent_idx: # get dependent parameters
+        X2.append(X[idx])
+    X_base = [] # base parameters
+    # X_base = X1 + beta@X2
+
+    # As X1 and X2 are string, we can not perform matrix multiplication directly
+    # here we loop manually to create the string representation of the base parameters
+    for i in range(len(X1)):
+        param = X1[i]
+        for j in range(len(X2)):
+            coef = beta[i, j]
+            if coef != 0:  # Skip zero coefficients
+                sign = '+' if coef >= 0 else ''
+                param += f" {sign}{coef}*{X2[j]}"
+        X_base.append(param)
+    return X_base
 
     
