@@ -172,34 +172,39 @@
     <parent link="Left_Hip_Pitch_1"/>
     <child link="Left_Link2_Hip_1"/>
     <axis xyz="1.0 0.0 -0.0"/>
-    <limit lower="-0.785" upper="0.785" effort="48" velocity="10"/>
+     <limit lower="-1.57" upper="1.57" effort="48" velocity="10"/> 
+    <!-- <limit lower="-0.785" upper="0.785" effort="48" velocity="10"/> -->
   </joint>
   <joint name="left_hip_yaw" type="revolute">
     <origin rpy="0 0 0" xyz="-0.0445 0.0 -0.1205"/>
     <parent link="Left_Link2_Hip_1"/>
     <child link="Left_Thigh_1"/>
     <axis xyz="-0.0 0.0 -1.0"/>
-    <limit lower="-0.785" upper="0.785" effort="100" velocity="10"/>
+    <limit lower="-1.57" upper="1.57" effort="48" velocity="10"/> 
+    <!-- <limit lower="-0.785" upper="0.785" effort="100" velocity="10"/> -->
   </joint>
     <joint name="left_knee" type="revolute">
     <origin rpy="0 0 0" xyz="0.0 0.017 -0.2035"/>
     <parent link="Left_Thigh_1"/>
     <child link="Left_Shank_1"/>
     <axis xyz="-0.0 1.0 0.0"/>
-    <limit lower="0" upper="2.094" effort="100" velocity="10"/>
+    <limit lower="-1.57" upper="1.57" effort="48" velocity="10"/> 
+    <!-- <limit lower="0" upper="2.094" effort="100" velocity="10"/> -->
   </joint>
   <joint name="left_ankle_roll" type="revolute">
     <origin rpy="0 0 0" xyz="0.019 -0.017 -0.335"/>
     <parent link="Left_Shank_1"/>
     <child link="Left_Ankle_Roll_1"/>
     <axis xyz="-1.0 -0.0 0.0"/>
-    <limit lower="-0.349" upper="0.349" effort="12" velocity="10"/>
+    <limit lower="-1.57" upper="1.57" effort="48" velocity="10"/> 
+    <!-- <limit lower="-0.349" upper="0.349" effort="12" velocity="10"/> -->
   </joint>
   <joint name="left_ankle_pitch" type="revolute">
     <origin xyz="-0.019 -0.015 0.0" rpy="0 0 0"/>
     <parent link="Left_Ankle_Roll_1"/>
     <child link="Left_Foot_1"/>
     <axis xyz="-0.0 1.0 -0.0"/>
-    <limit lower="-0.52" upper="0.5" effort="100" velocity="10"/>
+    <limit lower="-1.57" upper="1.57" effort="48" velocity="10"/> 
+    <!-- <limit lower="-0.52" upper="0.5" effort="100" velocity="10"/> -->
   </joint>
 </robot>
