@@ -139,11 +139,13 @@ def calculate_standard_regressor (pin_model, pin_data, q_rand, dq_rand, ddq_rand
     no_dof = pin_model.nv # number of actuated joints = number of moving bodies
     no_params = 10 * pin_model.nv  # exclude the universe body
 
-    Y = np.zeros((nb_samples * no_dof, no_params)) # initialize the regressor matrix
+    #Y = np.zeros((nb_samples * no_dof, no_params)) # initialize the regressor matrix
+    Y = np.empty((0, no_params))  # initialize the regressor matrix as a list
     for i in range(nb_samples):
         Y_temp = pin.computeJointTorqueRegressor(pin_model, pin_data, q_rand[i, :], dq_rand[i, :], ddq_rand[i, :])
         # stack the regressor matrices in row
-        Y[i * no_dof : (i + 1) * no_dof, :] = Y_temp
+        # Y[i * no_dof : (i + 1) * no_dof, :] = Y_temp
+        Y = np.vstack((Y, Y_temp))
     return Y
 
 def get_unidentificable_parameter_index (Y, tol = 1e-6):

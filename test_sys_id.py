@@ -7,6 +7,7 @@ from SysIDUtils import helpers as sysid_helpers
 from sys import argv
 from pathlib import Path
 from matplotlib import pyplot as plt
+import mujoco
 
 # PATH_TO_URDF_FILE = 'robot_models/left_leg/left_leg.urdf'
 package_dirs = Path("robot_models/left_leg")
@@ -21,6 +22,35 @@ model = pin.buildModelFromUrdf(urdf_filename)
 print("model name: " + model.name)
 # create data
 data = model.createData()
+
+# load mujoco model
+mj_model = mujoco.MjModel.from_xml_path(str(urdf_filename))
+mj_data = mujoco.MjData(mj_model)
+# Check some properties of the mujoco model
+print("\n=== MuJoCo Model Properties ===")
+print("number of joints (njnt): " + str(mj_model.njnt))
+print("number of generalized coordinates (nq): " + str(mj_model.nq))
+print("number of degrees of freedom (nv): " + str(mj_model.nv))
+print("number of bodies (nbody): " + str(mj_model.nbody))
+print("number of actuators (nu): " + str(mj_model.nu))
+print("number of sensors (nsensor): " + str(mj_model.nsensor))
+print("number of geoms (ngeom): " + str(mj_model.ngeom))
+print("timestep: " + str(mj_model.opt.timestep))
+
+# Print body names
+print("\nMuJoCo Body names:")
+for i in range(mj_model.nbody):
+    body_name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_BODY, i)
+    print(f"  Body {i}: {body_name}")
+
+# Print joint names
+print("\nMuJoCo Joint names:")
+for i in range(mj_model.njnt):
+    joint_name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_JOINT, i)
+    joint_type = mj_model.jnt_type[i]
+    print(f"  Joint {i}: {joint_name} (type: {joint_type})")
+
+print("\n=== Pinocchio Model Properties ===")
 
 # infere some basic information of the model
 print("number of joints (njoints): " + str(model.njoints))
@@ -94,8 +124,18 @@ for i in range(model.nq):
 
 # Torque computed by pinocchio RNEA
 torque_pin = np.zeros((n_samples, model.nv))
+torque_mujoco = np.zeros((n_samples, model.nv))
 for i in range(n_samples):
     torque_pin[i, :] = pin.rnea(model, data, q_traj[i, :], qd_traj[i, :], qdd_traj[i, :])
+
+    # set mj_data qpos, qvel, qacc
+    mj_data.qpos[:] = q_traj[i, :]
+    mj_data.qvel[:] = qd_traj[i, :]
+    mj_data.qacc[:] = qdd_traj[i, :]
+    # call mj_inverse to compute torques
+    mujoco.mj_inverse(mj_model, mj_data)
+    # get the computed torques
+    torque_mujoco[i, :] = mj_data.qfrc_inverse[:]
 
 # Torque computed by standard regressor model
 standard_param_values = sysid_helpers.get_standard_parameters_values(model)
@@ -127,8 +167,8 @@ plt.legend()
 #plot joint torques
 plt.figure()
 for i in range(model.nv):
-    plt.plot(time, torque_pin[:, i], label='tau_pin'+str(i+1))
-    plt.plot(time, tau_standard_reg[:, i], '--', label='tau_reduced_reg'+str(i+1))
+    plt.plot(time, torque_mujoco[:, i], label='torque_mujoco'+str(i+1))
+    # plt.plot(time, torque_pin[:, i], '--', label='torque_pin'+str(i+1))
     plt.plot(time, torque_base_reg[:, i], ':', label='tau_base_reg'+str(i+1))
 plt.xlabel('Time [s]')
 plt.ylabel('Joint Torque')
