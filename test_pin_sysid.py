@@ -4,6 +4,8 @@
 import pinocchio as pin
 import numpy as np
 from SysIDUtils import helpers as sysid_helpers
+from SysIDUtils import mjc_regressors as mjc_reg
+from SysIDUtils import mjc_parameters as mjc_params
 from sys import argv
 from pathlib import Path
 from matplotlib import pyplot as plt
@@ -64,7 +66,12 @@ for i, name in enumerate(model.names):
     print(f"  Joint {i}: {name}")
 
 # generate a list containing the full set of standard parameters
-standard_params = sysid_helpers.get_standard_parameters_dict(model) # return a dictionary of standard parameters including symbols and values
+standard_params_dict = sysid_helpers.get_standard_parameters_dict(model) # return a dictionary of standard parameters including symbols and values
+
+print("\n=== Full set of standard dynamic parameters ===")
+for param_name, param_value in standard_params_dict.items():
+    print(f"  {param_name}: {param_value}")
+
 standard_param_symbols_list = sysid_helpers.get_list_standard_param_symbols(model) # return a list of standard parameter symbols
 print("\n total of Standard parameters: " + str(len(standard_param_symbols_list)))
 print("\nStandard parameter symbols list: ")

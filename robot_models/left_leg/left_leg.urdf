@@ -3,9 +3,9 @@
 <mujoco>
     <compiler meshdir="meshes/" balanceinertia="true" discardvisual="false"/>
   </mujoco>
-  <material name="silver">
+  <!-- <material name="silver">
     <color rgba="0.700 0.700 0.700 1.000"/>
-  </material>
+  </material> -->
   <link name="world"/>
   <link name="Left_Hip_Pitch_1">
     <inertial>
@@ -128,7 +128,7 @@
     <origin rpy="0 0 0" xyz="0.0 0.089761 -0.081437"/>
     <parent link="world"/>
     <child link="Left_Hip_Pitch_1"/>
-    <axis xyz="-0.0 0.965926 -0.258819"/>
+    <axis xyz="0 1 0"/>
     <limit lower="-1.57" upper="1.57" effort="48" velocity="10"/>
   </joint>
   <joint name="left_hip_roll" type="revolute">
