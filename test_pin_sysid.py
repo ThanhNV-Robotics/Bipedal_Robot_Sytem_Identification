@@ -159,7 +159,7 @@ torque_reduced_reg = torque_reduced_reg.reshape((n_samples, model.nv)) # reshape
 
 
 # Torque computed by base regressor model
-W_base_traj, base_param_values = sysid_helpers.compute_base_model(W_standard_traj, standard_param_values, TOL_QR=1e-6)
+W_base_traj, base_param_values, P1, P2 = sysid_helpers.compute_base_model(W_standard_traj, standard_param_values, TOL_QR=1e-6)
 torque_base_reg = W_base_traj @ base_param_values
 torque_base_reg = torque_base_reg.reshape((n_samples, model.nv)) # reshape torque_base_reg to (n_samples, nv)
 

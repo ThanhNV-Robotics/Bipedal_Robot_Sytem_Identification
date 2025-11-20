@@ -228,7 +228,7 @@ def calculate_base_parameters_symbols (Y, param_st, TOL_QR=1e-6):
         if abs(R[i, i]) < TOL_QR:
             numerical_rank_Y = i
             break
-    R1 = R[:numerical_rank_Y, :numerical_rank_Y] # R1 is full rank upper triangular matrix
+    R1 = R[:numerical_rank_Y, :numerical_rank_Y] # R1 is full rank, squared, upper triangular matrix
     R2 = R[:numerical_rank_Y, numerical_rank_Y:]
     P = np.eye(p.size)[p] # permutation matrix
 
@@ -238,10 +238,10 @@ def calculate_base_parameters_symbols (Y, param_st, TOL_QR=1e-6):
     # Check relationship in regressor matrix Y
     # we have to transpose P because the relation is:
     # Y_reduced @ P.T = Q @ R
-    P1_T = np.transpose(P)[:, :numerical_rank_Y] # correspond to independent part
-    P2_T = np.transpose(P)[:, numerical_rank_Y:] # correspond to dependent part
-    Y1 = Y_reduced@P1_T # columns correspond to independent part 
-    Y2 = Y_reduced@P2_T # columns correspond to dependent part
+    P1 = np.transpose(P)[:, :numerical_rank_Y] # correspond to independent part
+    P2 = np.transpose(P)[:, numerical_rank_Y:] # correspond to dependent part
+    Y1 = Y_reduced@P1 # columns correspond to independent part 
+    Y2 = Y_reduced@P2 # columns correspond to dependent part
     Y2_estimated = Y1 @ beta # beta is the coefficient matrix
     residual = Y2 - Y2_estimated
     max_residual = np.max(np.abs(residual))
@@ -314,10 +314,10 @@ def compute_base_regressor (Y, TOL_QR=1e-6):
     # Check relationship in regressor matrix Y
     # we have to transpose P because the relation is:
     # Y_reduced @ P.T = Q @ R
-    P1_T = np.transpose(P)[:, :numerical_rank_Y] # correspond to independent part
-    P2_T = np.transpose(P)[:, numerical_rank_Y:] # correspond to dependent part
-    Y1 = Y_reduced@P1_T # columns correspond to independent part 
-    Y2 = Y_reduced@P2_T # columns correspond to dependent part
+    P1 = np.transpose(P)[:, :numerical_rank_Y] # correspond to independent part
+    P2 = np.transpose(P)[:, numerical_rank_Y:] # correspond to dependent part
+    Y1 = Y_reduced@P1 # columns correspond to independent part 
+    Y2 = Y_reduced@P2 # columns correspond to dependent part
     Y2_estimated = Y1 @ beta # beta is the coefficient matrix
     residual = Y2 - Y2_estimated
     max_residual = np.max(np.abs(residual))
@@ -382,10 +382,10 @@ def compute_base_model (Y_standard, standard_param_values,TOL_QR=1e-6):
     # Check relationship in regressor matrix Y
     # we have to transpose P because the relation is:
     # Y_reduced @ P.T = Q @ R
-    P1_T = np.transpose(P)[:, :numerical_rank_Y] # correspond to independent part
-    P2_T = np.transpose(P)[:, numerical_rank_Y:] # correspond to dependent part
-    Y1 = Y_reduced@P1_T # columns correspond to independent part 
-    Y2 = Y_reduced@P2_T # columns correspond to dependent part
+    P1 = np.transpose(P)[:, :numerical_rank_Y] # correspond to independent part
+    P2 = np.transpose(P)[:, numerical_rank_Y:] # correspond to dependent part
+    Y1 = Y_reduced@P1 # columns correspond to independent part 
+    Y2 = Y_reduced@P2 # columns correspond to dependent part
     Y2_estimated = Y1 @ beta # beta is the coefficient matrix
     residual = Y2 - Y2_estimated
     max_residual = np.max(np.abs(residual))
@@ -396,20 +396,22 @@ def compute_base_model (Y_standard, standard_param_values,TOL_QR=1e-6):
         print("Max residual in base parameter calculation: ", max_residual)
 
     # Find base parameters
-    independent_idx = p[:numerical_rank_Y] # indices of independent parameters in X
-    dependent_idx = p[numerical_rank_Y:] # indices of dependent parameters in X
+    X1 = np.transpose(P1)@X_reduced
+    X2 = np.transpose(P2)@X_reduced
+    # independent_idx = p[:numerical_rank_Y] # indices of independent parameters in X
+    # dependent_idx = p[numerical_rank_Y:] # indices of dependent parameters in X
     
-    X1 = [] # independent parameters
-    X2 = [] # dependent parameters
+    # X1 = [] # independent parameters
+    # X2 = [] # dependent parameters
 
-    for idx in independent_idx: # get independent parameters
-        X1.append(X_reduced[idx])
-    for idx in dependent_idx: # get dependent parameters
-        X2.append(X_reduced[idx])
+    # for idx in independent_idx: # get independent parameters
+    #     X1.append(X_reduced[idx])
+    # for idx in dependent_idx: # get dependent parameters
+    #     X2.append(X_reduced[idx])
 
     X_base = X1 + beta@X2
     Y_base = Y1
 
-    return Y_base, X_base
+    return Y_base, X_base, P1, P2
 
     

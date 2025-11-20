@@ -21,7 +21,8 @@ def step_ref (t, T, ref_angl): # to generate referenc angle
     if  t <= T:
         angle = (6*(t/T)**5 - 15*(t/T)**4 + 10*(t/T)**3)*ref_angl
         velocity = (30*t**4/T**5 - 60*t**3/T**4 + 30*t**2/T**3)*ref_angl
-        return angle.reshape((len(ref_angl),1)), velocity.reshape((len(ref_angl),1))
+        acceleration = (120*t**3/T**5 - 180*t**2/T**4 + 60*t/T**3)*ref_angl
+        return angle.reshape((len(ref_angl),1)), velocity.reshape((len(ref_angl),1)), acceleration.reshape((len(ref_angl),1))
     else:
         return ref_angl.reshape((len(ref_angl),1)), np.zeros(len(ref_angl))
 
@@ -52,21 +53,23 @@ def generate_ref_trajectory(joint_range, init_duration, trajectory_duration, fre
     joint_range: contains lower and upper limits
     feed_back_angle: current joint position
     """
-    ref_angle, ref_vel = np.zeros(len(feedback_angle)), np.zeros(len(feedback_angle)) # vectorized
+    ref_angle, ref_vel, ref_accel = np.zeros(len(feedback_angle)), np.zeros(len(feedback_angle)), np.zeros(len(feedback_angle)) # vectorized
     starting_point = (joint_range[:,0] + joint_range[:,1]) / 2
     if t>= trajectory_duration + init_duration:
         ref_angle = feedback_angle
         ref_vel = np.zeros(len(feedback_angle))
-        return ref_angle, ref_vel
+        ref_accel = np.zeros(len(feedback_angle))
+        return ref_angle, ref_vel, ref_accel
     if t<= init_duration:
-        ref_angle, ref_vel = step_ref(t, init_duration, starting_point)
-        return ref_angle, ref_vel
+        ref_angle, ref_vel, ref_accel = step_ref(t, init_duration, starting_point)
+        return ref_angle, ref_vel, ref_accel
     
     if t > init_duration:
         ref_angle = starting_point + 0.8*(joint_range[:,1] - joint_range[:,0]) / 2 * np.sin(2 * np.pi * frequency * (t - init_duration))
         ref_vel = 0.8*(joint_range[:,1] - joint_range[:,0]) / 2 * 2 * np.pi * frequency * np.cos(2 * np.pi * frequency * (t - init_duration))
-        return ref_angle.reshape((len(ref_angle),1)), ref_vel.reshape((len(ref_vel),1))
-    return ref_angle, ref_vel
+        ref_accel = -0.8*(joint_range[:,1] - joint_range[:,0]) / 2 * (2 * np.pi * frequency)**2 * np.sin(2 * np.pi * frequency * (t - init_duration))
+        return ref_angle.reshape((len(ref_angle),1)), ref_vel.reshape((len(ref_vel),1)), ref_accel.reshape((len(ref_accel),1))
+    return ref_angle, ref_vel, ref_accel
 
 class first_order_lfilter:
     """
@@ -109,7 +112,7 @@ trajectory_duration = 20 # seconds, time of trajectory running
 
 # Init a first-order low-pass filter
 w_c = 2 * np.pi * 0.5  # cutoff frequency 0.5 Hz
-Ts = dt_control  # sampling time
+Ts = mj_time_step  # sampling time
 lpf_pos = first_order_lfilter(a=0.1, w_c=w_c, Ts=Ts)
 lpf_vel = first_order_lfilter(a=0.1, w_c=w_c, Ts=Ts)
 traj_freq = np.array([0.2, 0.25, 0.3, 0.35, 0.35, 0.45])  # frequency for each joint
@@ -158,6 +161,7 @@ viewer = launch_passive(mj_model, mj_data)
 save_data = []
 ref_joint_angle = np.zeros((mj_model.njnt,1))   #initial reference joint angle
 ref_joint_velocity = np.zeros((mj_model.njnt,1))#initial reference joint velocity
+ref_joint_acceleration = np.zeros((mj_model.njnt,1))#initial reference joint acceleration
 
 if __name__ == "__main__":
     while viewer.is_running() and simu_time < trajectory_duration:
@@ -168,34 +172,35 @@ if __name__ == "__main__":
         # ──────────────────────────────────────────────────────────────────────
         robot_joint_feb_angl = Get_Joints_Pos(mj_model, mj_data) # Get feedback position
         robot_joint_feb_vel = Get_Joint_Vel(mj_model, mj_data)
-        
-        time_count += 1
-
         # ──────────────────────────────────────────────────────────────────────
         #   Generate reference trajectory with frequency =  control frequency
         # ──────────────────────────────────────────────────────────────────────
+        ref_joint_angle, ref_joint_velocity, ref_joint_acceleration = generate_ref_trajectory(joint_ranges, 2, trajectory_duration, traj_freq, robot_joint_feb_angl, t_control)
+        ref_joint_angle = lpf_pos.filter(ref_joint_angle, lpf_pos.y_prev)
+        ref_joint_velocity = lpf_vel.filter(ref_joint_velocity, lpf_vel.y_prev)
+
+        # ──────────────────────────────────────────────────────────────────────
+        #   Data saving at sampling frequency
+        # ──────────────────────────────────────────────────────────────────────
+        time_count += 1
         if time_count >= (int)(dt_control/mj_time_step):
             t_control += dt_control
             time_count = 0
-        
-            ref_joint_angle, ref_joint_velocity = generate_ref_trajectory(joint_ranges, 2, trajectory_duration, traj_freq, robot_joint_feb_angl, t_control)
-            ref_joint_angle = lpf_pos.filter(ref_joint_angle, lpf_pos.y_prev)
-            ref_joint_velocity = lpf_vel.filter(ref_joint_velocity, lpf_vel.y_prev)
-            
+            robot_joint_feb_angl = Get_Joints_Pos(mj_model, mj_data) # Get feedback position
+            robot_joint_feb_vel = Get_Joint_Vel(mj_model, mj_data)
+            joint_torque = mj_data.qfrc_actuator  # Get joint torque from actuators           
             # # stack data to save
-            data_point = np.concatenate(([t_control], ref_joint_angle.flatten(), robot_joint_feb_angl.flatten(),robot_joint_feb_vel.flatten(), control_torque.flatten()))
+            data_point = np.concatenate(([t_control], ref_joint_angle.flatten(), robot_joint_feb_angl.flatten(),robot_joint_feb_vel.flatten(), joint_torque.flatten(), ref_joint_acceleration.flatten()))
             save_data.append(data_point)
         # ──────────────────────────────────────────────────────────────────────
         #   Compute PD control torque
         # ──────────────────────────────────────────────────────────────────────
         control_torque = PDController.PD_Control_Calculate(ref_joint_angle, ref_joint_velocity, robot_joint_feb_angl, robot_joint_feb_vel)
-
         mj_data.ctrl = np.array(control_torque).reshape(1,-1)        
-        viewer.sync()
-        
+        viewer.sync()        
     viewer.close()
 
-# plot results after simulation
+
 save_data = np.array(save_data)
 
 # Create data directory if it doesn't exist
@@ -213,11 +218,14 @@ header = 'time,' \
 'ref_q1,ref_q2,ref_q3,ref_q4,ref_q5,ref_q6' \
 ',q1,q2,q3,q4,q5,q6,' \
 'vel_q1,vel_q2,vel_q3,vel_q4,vel_q5,vel_q6,' \
-'tau1,tau2,tau3,tau4,tau5,tau6'
+'tau1,tau2,tau3,tau4,tau5,tau6,' \
+'ref_acc1,ref_acc2,ref_acc3,ref_acc4,ref_acc5,ref_acc6'
 
 save_path_csv = os.path.join(data_dir, 'left_leg_simulation_data.csv')
 np.savetxt(save_path_csv, save_data, delimiter=',', header=header, comments='', fmt='%.6f')
 print(f"Data also saved to '{save_path_csv}'")
+
+# plot results after simulation
 
 time_data = save_data[:,0]
 ref_angle_data = save_data[:,1:7]
