@@ -20,8 +20,8 @@ def get_standard_parameters_dict(model):
         "mz",
         "Ixx",
         "Ixy",
-        "Ixz",
         "Iyy",
+        "Ixz",
         "Iyz",
         "Izz",
     )
@@ -55,40 +55,14 @@ def get_standard_parameters_values(model):
     Input: model -> pinocchio model
     Output: params_values -> list of standard parameter values
     """
-    Y = []
-
-    params_name = (
-        "m",
-        "mx",
-        "my",
-        "mz",
-        "Ixx",
-        "Ixy",
-        "Ixz",
-        "Iyy",
-        "Iyz",
-        "Izz",
-    )
+    X = np.array([])
     # range_ = len(model.inertias) # = 7, including the world body
     for i in range(1, len(model.inertias)):
         # model.inertias[i].toDynamicParameters() return dynamic parameters in the order of
-        # ['m', 'mx','my','mz','Ixx','Ixy','Ixz', 'Iyy', 'Iyz','Izz'] of body i
+        # ['m', 'mx','my','mz','Ixx','Ixy','Iyy', 'Ixz', 'Iyz','Izz'] of body i
         P = model.inertias[i].toDynamicParameters()
-        P_mod = np.zeros(P.shape[0])
-        P_mod[0] = P[0]  # m
-        P_mod[1] = P[1]  # mx
-        P_mod[2] = P[2]  # my
-        P_mod[3] = P[3]  # mz
-        P_mod[4] = P[4]  # Ixx
-        P_mod[5] = P[5]  # Ixy
-        P_mod[6] = P[6]  # Ixz
-        P_mod[7] = P[8]  # Iyy
-        P_mod[8] = P[9]  # Iyz
-        P_mod[9] = P[7]  # Izz
-
-        for k in P_mod:
-            Y.append(k)
-    return Y
+        X = np.hstack((X, P))
+    return X
 
 def get_list_standard_param_symbols (model):
     """
@@ -104,8 +78,8 @@ def get_list_standard_param_symbols (model):
         "mz",
         "Ixx",
         "Ixy",
-        "Ixz",
         "Iyy",
+        "Ixz",
         "Iyz",
         "Izz",
     )
@@ -139,25 +113,25 @@ def calculate_standard_regressor (pin_model, pin_data, q_rand, dq_rand, ddq_rand
     no_dof = pin_model.nv # number of actuated joints = number of moving bodies
     no_params = 10 * pin_model.nv  # exclude the universe body
 
-    #Y = np.zeros((nb_samples * no_dof, no_params)) # initialize the regressor matrix
-    Y = np.empty((0, no_params))  # initialize the regressor matrix as a list
+    Y = np.zeros((nb_samples * no_dof, no_params)) # initialize the regressor matrix
+
     for i in range(nb_samples):
         Y_temp = pin.computeJointTorqueRegressor(pin_model, pin_data, q_rand[i, :], dq_rand[i, :], ddq_rand[i, :])
-        # stack the regressor matrices in row
-        # Y[i * no_dof : (i + 1) * no_dof, :] = Y_temp
-        Y = np.vstack((Y, Y_temp))
+        # stack the regressor matrices
+        Y[i * no_dof : (i + 1) * no_dof, :] = Y_temp
     return Y
 
-def get_unidentificable_parameter_index (Y, tol = 1e-6):
+def get_unidentificable_parameter_index (model, data, tol = 1e-6):
     """
     This function returns the index of unidentifiable parameters in the standard regressor matrix.
     Y: standard regressor matrix
     tol: tolerance for identifying unidentifiable parameters
     """
+    Y_rand = generate_random_regressor_samples(model, data,n_samples=30)
     # check each column of Y if its norm is less than tol
     idx_unidentifiable = []
-    for i in range(Y.shape[1]):
-        if np.linalg.norm(Y[:, i]) < tol:
+    for i in range(Y_rand.shape[1]):
+        if np.linalg.norm(Y_rand[:, i]) < tol:
             idx_unidentifiable.append(i)
     return idx_unidentifiable
 
@@ -186,7 +160,59 @@ def compute_numerical_rank (Y, TOL_QR=1e-6):
             break
     return numerical_rank
 
-def calculate_base_parameters_symbols (Y, param_st, TOL_QR=1e-6):
+def compute_base_parameter_values (model, data, TOL_QR=1e-6):
+    """
+    This function computes the base parameter values of the robot model.
+
+    Input: model -> pinocchio model
+           data -> pinocchio data
+           TOL_QR: tolerance for QR decomposition
+
+    returns:
+    X_base_values: base parameter values
+    """
+    X_standard_values = get_standard_parameters_values(model)
+    Y_rand = generate_random_regressor_samples(model, data,n_samples=30)
+    Y_base, X_base_values, P1, P2 = compute_base_model(model, data, Y_rand, X_standard_values, TOL_QR=TOL_QR)
+    return X_base_values, P1, P2
+
+def generate_random_regressor_samples(model, data, n_samples=30):
+    """
+    This function generates random samples of joint positions, velocities, and accelerations
+    and computes the corresponding standard regressor matrix.
+
+    Input: model -> pinocchio model
+           n_samples -> number of random samples to generate
+
+    returns:
+    W_standard -> standard regressor matrix
+    q_rand -> random joint positions
+    dq_rand -> random joint velocities
+    ddq_rand -> random joint accelerations
+    """
+    # get vectors of joint limits, velocity limits
+    joint_lower_limits = []
+    joint_upper_limits = []
+    joint_velocity_limits = []
+    joint_lower_limits = model.lowerPositionLimit.copy()
+    joint_upper_limits = model.upperPositionLimit.copy()
+    joint_velocity_limits = model.velocityLimit.copy()
+    joint_lower_limits = np.array(joint_lower_limits)
+    joint_upper_limits = np.array(joint_upper_limits)
+    joint_velocity_limits = np.array(joint_velocity_limits)
+    # default limit qdd to 6*pi rad/s2
+    joint_acceleration_limits = 6 * np.pi * np.ones(model.nv)
+
+    # generate n_samples of q_rand, dq_rand, ddq_rand
+    q_rand = np.array([pin.randomConfiguration(model) for _ in range(n_samples)])
+    dq_rand = np.random.uniform(low=-joint_velocity_limits, high=joint_velocity_limits, size=(n_samples, model.nv))
+    ddq_rand = np.random.uniform(low=-joint_acceleration_limits, high=joint_acceleration_limits, size=(n_samples, model.nv))
+
+    # construct standard regressor matrix
+    W_standard = calculate_standard_regressor(model, data, q_rand, dq_rand, ddq_rand)
+
+    return W_standard
+def calculate_base_parameters_symbols (model,data, TOL_QR=1e-6):
     """
     This function calculates the base parameters of the robot model.
 
@@ -203,10 +229,12 @@ def calculate_base_parameters_symbols (Y, param_st, TOL_QR=1e-6):
     machine_eps = np.finfo(float).eps  # Approx. 2.22e-16
     tolerance = np.sqrt(machine_eps)  # Approx. 1.49e-8
 
+    Y = generate_random_regressor_samples(model, data,n_samples=30)
+
     # step 1: remove zero columns from Y
-    idx_unidentifiable = get_unidentificable_parameter_index(Y)
+    idx_unidentifiable = get_unidentificable_parameter_index(model, data, tol = 1e-6)
     Y_reduced = np.delete(Y, idx_unidentifiable, axis=1) # remove the 0 columns
-    X = param_st 
+    X = get_list_standard_param_symbols(model)
     for idx in idx_unidentifiable: # remove unidentifiable parameters
         # use pop(index) to remove the parameter at the specific index 
         X.pop(idx) # remove the corresponding parameters
@@ -275,7 +303,7 @@ def calculate_base_parameters_symbols (Y, param_st, TOL_QR=1e-6):
                 sign = '+' if coef >= 0 else ''
                 param += f" {sign}{coef}*{X2[j]}"
         X_base.append(param)
-    return X_base, beta, independent_idx, dependent_idx
+    return X_base, beta, P1, P2
 
 def compute_base_regressor (Y, TOL_QR=1e-6):
     """
@@ -336,7 +364,7 @@ def compute_base_regressor (Y, TOL_QR=1e-6):
         Y_base = Y1 # Y_base is the independent part Y1
         return Y_base, beta, independent_idx, dependent_idx
     
-def compute_base_model (Y_standard, standard_param_values,TOL_QR=1e-6):
+def compute_base_model (model, data, Y_standard, standard_param_values,TOL_QR=1e-6):
     """
     This function computes the base parameter values of the robot model.
 
@@ -351,7 +379,7 @@ def compute_base_model (Y_standard, standard_param_values,TOL_QR=1e-6):
     tolerance = np.sqrt(machine_eps)  # Approx. 1.49e-8
 
     # step 1: remove zero columns from Y
-    idx_unidentifiable = get_unidentificable_parameter_index(Y_standard)
+    idx_unidentifiable = get_unidentificable_parameter_index(model, data, tol = 1e-6)
     Y_reduced = np.delete(Y_standard, idx_unidentifiable, axis=1) # remove the 0 columns
     X_reduced = np.delete(standard_param_values, idx_unidentifiable, axis=0) # remove the unidentified parameters
 

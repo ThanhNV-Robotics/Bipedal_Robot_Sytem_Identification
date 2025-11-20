@@ -45,6 +45,16 @@ def Get_Joint_Vel (mj_model, mj_data):
     if n> 12:
         q_vel = q_vel[1:] # ignore the velocity of the torso, only take the joint position
     return np.array(q_vel)
+
+def Get_Joint_Acc (mj_model, mj_data):
+    q_acc = []
+    joint_names = [mj_model.joint(i).name for i in range(mj_model.njnt)]
+    for joint in joint_names:
+        q_acc.append(mj_data.joint(joint).qacc)
+    n = len(q_acc)
+    if n> 12:
+        q_acc = q_acc[1:] # ignore the velocity of the torso, only take the joint position
+    return np.array(q_acc)
  
 def generate_ref_trajectory(joint_range, init_duration, trajectory_duration, frequency, feedback_angle, t):
     """
@@ -115,7 +125,7 @@ w_c = 2 * np.pi * 0.5  # cutoff frequency 0.5 Hz
 Ts = mj_time_step  # sampling time
 lpf_pos = first_order_lfilter(a=0.1, w_c=w_c, Ts=Ts)
 lpf_vel = first_order_lfilter(a=0.1, w_c=w_c, Ts=Ts)
-traj_freq = np.array([0.2, 0.25, 0.3, 0.35, 0.35, 0.45])  # frequency for each joint
+traj_freq = np.array([0.35, 0.25, 0.3, 0.35, 0.35, 0.45])  # frequency for each joint
 
 # #-----------------------------------------------
 # # For testing the generated reference trajectory
@@ -152,8 +162,8 @@ traj_freq = np.array([0.2, 0.25, 0.3, 0.35, 0.35, 0.45])  # frequency for each j
 # ──────────────────────────────────────────────────────────────────────
 #   Init Low-level PD impedence controller
 # ──────────────────────────────────────────────────────────────────────
-Joint_Kp = np.diag([500, 500, 150, 350, 250, 250]) # N.m/rad
-Joint_Kd = np.diag([1.5, 1.5, 1.5, 1.5, 1.5, 1.5]) #N.ms/rad
+Joint_Kp = np.diag([200, 200, 100, 150, 10, 10]) # N.m/rad
+Joint_Kd = np.diag([1.5, 1.5, 1.5, 1.5, 0.15, 0.15]) #N.ms/rad
 PDController= PD_Impedence_Control(Joint_Kp, Joint_Kd) # init robot's joint PD controller
 
 viewer = launch_passive(mj_model, mj_data)
@@ -172,10 +182,11 @@ if __name__ == "__main__":
         # ──────────────────────────────────────────────────────────────────────
         robot_joint_feb_angl = Get_Joints_Pos(mj_model, mj_data) # Get feedback position
         robot_joint_feb_vel = Get_Joint_Vel(mj_model, mj_data)
+        robot_joint_feb_acc = Get_Joint_Acc(mj_model, mj_data)
         # ──────────────────────────────────────────────────────────────────────
         #   Generate reference trajectory with frequency =  control frequency
         # ──────────────────────────────────────────────────────────────────────
-        ref_joint_angle, ref_joint_velocity, ref_joint_acceleration = generate_ref_trajectory(joint_ranges, 2, trajectory_duration, traj_freq, robot_joint_feb_angl, t_control)
+        ref_joint_angle, ref_joint_velocity, ref_joint_acceleration = generate_ref_trajectory(joint_ranges, 1, trajectory_duration, traj_freq, robot_joint_feb_angl, t_control)
         ref_joint_angle = lpf_pos.filter(ref_joint_angle, lpf_pos.y_prev)
         ref_joint_velocity = lpf_vel.filter(ref_joint_velocity, lpf_vel.y_prev)
 
@@ -190,7 +201,7 @@ if __name__ == "__main__":
             robot_joint_feb_vel = Get_Joint_Vel(mj_model, mj_data)
             joint_torque = mj_data.qfrc_actuator  # Get joint torque from actuators           
             # # stack data to save
-            data_point = np.concatenate(([t_control], ref_joint_angle.flatten(), robot_joint_feb_angl.flatten(),robot_joint_feb_vel.flatten(), joint_torque.flatten(), ref_joint_acceleration.flatten()))
+            data_point = np.concatenate(([t_control], ref_joint_angle.flatten(), robot_joint_feb_angl.flatten(),robot_joint_feb_vel.flatten(), joint_torque.flatten(), robot_joint_feb_acc.flatten()))
             save_data.append(data_point)
         # ──────────────────────────────────────────────────────────────────────
         #   Compute PD control torque
@@ -219,7 +230,7 @@ header = 'time,' \
 ',q1,q2,q3,q4,q5,q6,' \
 'vel_q1,vel_q2,vel_q3,vel_q4,vel_q5,vel_q6,' \
 'tau1,tau2,tau3,tau4,tau5,tau6,' \
-'ref_acc1,ref_acc2,ref_acc3,ref_acc4,ref_acc5,ref_acc6'
+'acc_q1,acc_q2,acc_q3,acc_q4,acc_q5,acc_q6'
 
 save_path_csv = os.path.join(data_dir, 'left_leg_simulation_data.csv')
 np.savetxt(save_path_csv, save_data, delimiter=',', header=header, comments='', fmt='%.6f')
@@ -232,6 +243,17 @@ ref_angle_data = save_data[:,1:7]
 joint_pos_data = save_data[:,7:13]
 joint_vel_data = save_data[:,13:19]
 control_torque_data = save_data[:,19:25]
+joint_acc_data =save_data[:,25:31]
+
+torque_mjc_inverse = np.zeros((len(time_data), mj_model.nv)) # ignore the torso joint
+mujoco.mj_resetData(mj_model, mj_data)
+for i in range(len(time_data)):
+    mj_data.qpos[:] = joint_pos_data[i,:]
+    mj_data.qvel[:] = joint_vel_data[i,:]
+    mj_data.qacc[:] = joint_acc_data[i,:]
+    mujoco.mj_inverse(mj_model, mj_data)
+    torque_mjc_inverse[i, :] = mj_data.qfrc_inverse[:]
+
 
 plt.figure()
 for i in range(6):
@@ -249,6 +271,7 @@ plt.figure()
 for i in range(6):
     plt.subplot(3,2,i+1)
     plt.plot(time_data, control_torque_data[:,i], label='Control Torque')
+    plt.plot(time_data, torque_mjc_inverse[:,i], label='Mujoco Inverse Torque')
     plt.title(f'Joint {i+1} Control Torque')
     plt.xlabel('Time (s)')
     plt.ylabel('Torque (N.m)')
