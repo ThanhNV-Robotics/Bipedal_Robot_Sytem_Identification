@@ -142,6 +142,29 @@ W_standard_traj_reduced = np.delete(W_standard_traj, zero_cols_idx, axis=1) # re
 
 W_base_traj = W_standard_traj_reduced@P1 # Calculate the base regressor matrix, P1 is the permutation matrix from QR decomposition
 
+# extend W_base_traj to include motor inertia and friction terms
+num_of_samples = W_base_traj.shape[0] // model.nv
+
+#Y_Im = np.zeros((num_of_samples * model.nv, model.nv)) # for motor inertia
+Y_Fvm = np.zeros((num_of_samples * model.nv, model.nv)) # for viscous friction
+Y_Fsm = np.zeros((num_of_samples * model.nv, model.nv)) # for static friction
+
+Y_extend = np.zeros((num_of_samples * model.nv, 2 * model.nv)) # final extended regressor matrix
+
+for i in range(num_of_samples): 
+    #Y_Im_temp = np.diag(ddq_feb_data_filted[i, :])
+    Y_Fvm_temp = np.diag(dq_feb_data[i, :])
+    Y_Fsm_temp = np.diag(np.sign(dq_feb_data[i, :]))
+
+    # Y_extend[i * model.nv : (i + 1) * model.nv, 0:model.nv] = Y_Im_temp
+    # Y_extend[i * model.nv : (i + 1) * model.nv, model.nv:2*model.nv] = Y_Fvm_temp
+    # Y_extend[i * model.nv : (i + 1) * model.nv, 2*model.nv:3*model.nv] = Y_Fsm_temp
+
+    Y_extend[i * model.nv : (i + 1) * model.nv, 0:model.nv] = Y_Fvm_temp
+    Y_extend[i * model.nv : (i + 1) * model.nv, model.nv:2*model.nv] = Y_Fsm_temp
+
+W_base_full = np.hstack((W_base_traj, Y_extend)) # final extended base regressor matrix
+
 
 # check W_base and base_param_values
 torque_standard_reg = W_standard_traj @ X_standard_values
@@ -171,20 +194,34 @@ print(np.linalg.matrix_rank(W_base_traj))
 
 # solution to the least square problem to estimate base parameters
 torque_data = torque_data.reshape(-1,1)  # reshape torque_data to 1D array
-Q, R = np.linalg.qr(W_base_traj)
+#Q, R = np.linalg.qr(W_base_traj)
+Q, R = np.linalg.qr(W_base_full)
 base_param_estimate = np.linalg.solve(R, Q.T @ torque_data)
 
-# stack base_param_estimate and base_param_values side by side and save to csv
-base_param_comparison = np.hstack((np.array(X_base_values).reshape(-1,1), np.array(base_param_estimate).reshape(-1,1)))
-param_save_path = os.path.join("data", "left_leg_base_parameters_estimation.csv")
-# save to csv
-np.savetxt(param_save_path, base_param_comparison, delimiter=',', header='True Base Parameters, Estimated Base Parameters', comments='', fmt='%.6f')
-print(f"\nBase parameters comparison saved to '{param_save_path}'")
+print("\nEstimated base parameters: ")
+for i in range(len(base_param_estimate)):
+    print(f"Parameter {i+1}: {base_param_estimate[i][0]}")
+
+# # stack base_param_estimate and base_param_values side by side and save to csv
+# base_param_comparison = np.hstack((np.array(X_base_values).reshape(-1,1), np.array(base_param_estimate).reshape(-1,1)))
+# param_save_path = os.path.join("data", "left_leg_base_parameters_estimation.csv")
+# # save to csv
+# np.savetxt(param_save_path, base_param_comparison, delimiter=',', header='True Base Parameters, Estimated Base Parameters', comments='', fmt='%.6f')
+# print(f"\nBase parameters comparison saved to '{param_save_path}'")
 
 # compare torque with estimated base parameters
-torque_base_reg_estimated = W_base_traj @ base_param_estimate
+# torque_base_reg_estimated = W_base_traj @ base_param_estimate
+torque_base_reg_estimated = W_base_full @ base_param_estimate
 torque_base_reg_estimated = torque_base_reg_estimated.reshape((len(time_data), model.nv)) #
 torque_data = torque_data.reshape((len(time_data), model.nv))
+
+torque_residual = torque_data - torque_base_reg_estimated
+
+# estimate motor inertia and friction parameters
+# Y_extend @ [Im, Fvm, Fsm] = torque_residual
+Q_fric, R_fric = np.linalg.qr(Y_extend)
+fric_param_estimate = np.linalg.solve(R_fric, Q_fric.T @ torque_residual.reshape(-1,1))
+
 plt.figure()
 for i in range(model.nv):
     plt.subplot(3,2,i+1)

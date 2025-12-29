@@ -81,7 +81,7 @@ def get_list_standard_param_symbols (model):
         "Iyy",
         "Ixz",
         "Iyz",
-        "Izz",
+        "Izz"
     )
     for i in range(1, len(model.inertias)):
         for j in params_name:
@@ -109,11 +109,13 @@ def calculate_standard_regressor (pin_model, pin_data, q_rand, dq_rand, ddq_rand
     dq_rand: vector of joint velocities
     ddq_rand: vector of joint accelerations
     """
+    standard_full_param = get_list_standard_param_symbols(pin_model)
+
     nb_samples = q_rand.shape[0] # q_rand samples are row-stacked
     no_dof = pin_model.nv # number of actuated joints = number of moving bodies
-    no_params = 10 * pin_model.nv  # exclude the universe body
+    no_full_params = len(standard_full_param) # exclude the universe body
 
-    Y = np.zeros((nb_samples * no_dof, no_params)) # initialize the regressor matrix
+    Y = np.zeros((nb_samples * no_dof, no_full_params)) # initialize the regressor matrix
 
     for i in range(nb_samples):
         Y_temp = pin.computeJointTorqueRegressor(pin_model, pin_data, q_rand[i, :], dq_rand[i, :], ddq_rand[i, :])
