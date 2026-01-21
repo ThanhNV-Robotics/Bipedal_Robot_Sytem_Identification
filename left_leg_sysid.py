@@ -52,7 +52,7 @@ X_base_values, P1, P2 = sysid_helpers.compute_base_parameter_values(model, data,
 
 
 # load saved data
-data_file_path = os.path.join("data", "left_leg_simulation_data.npy")
+data_file_path = os.path.join("data","simu","left_leg_simulation_data.npy")
 saved_data = np.load(data_file_path)
 print("\nsaved data shape:", saved_data.shape)
 time_data = saved_data[:,0]
