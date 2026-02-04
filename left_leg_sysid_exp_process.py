@@ -17,7 +17,8 @@ mj_data = mujoco.MjData(mj_model)
 
 
 # load saved data from CSV
-DATA_FILE_PATH = "data/exp/left_knee_only.csv"
+DATA_FILE_PATH = "data/exp/left_leg_trajectory_run_05_ok.csv"
+# DATA_FILE_PATH = "data/exp/left_knee_only.csv"
 saved_data = np.loadtxt(DATA_FILE_PATH, delimiter=',', skiprows=1)
 print("\nsaved data shape:", saved_data.shape)
 time_data = saved_data[:, 0] - saved_data[0, 0]  # Convert to seconds starting from 0
@@ -77,92 +78,92 @@ fig, axes = plt.subplots(3, 1, figsize=(12, 10))
 
 joint_names = ['Hip Pitch', 'Hip Roll', 'Hip Yaw', 'Knee', 'Ankle Roll', 'Ankle Pitch']
 
-# # Plot positions
-# for i in range(6):
-#     axes[0].plot(time_data, q_feb_data[:, i], label=joint_names[i])
-# axes[0].set_ylabel('Position (rad)')
-# axes[0].set_title('Joint Positions')
-# axes[0].legend()
-# axes[0].grid(True)
+# Plot positions
+for i in range(6):
+    axes[0].plot(time_data, q_feb_data[:, i], label=joint_names[i])
+axes[0].set_ylabel('Position (rad)')
+axes[0].set_title('Joint Positions')
+axes[0].legend()
+axes[0].grid(True)
 
-# # Plot velocities
-# for i in range(6):
-#     axes[1].plot(time_data, dq_feb_data[:, i], label=joint_names[i])
-# axes[1].set_ylabel('Velocity (rad/s)')
-# axes[1].set_title('Joint Velocities')
-# axes[1].legend()
-# axes[1].grid(True)
+# Plot velocities
+for i in range(6):
+    axes[1].plot(time_data, dq_feb_data[:, i], label=joint_names[i])
+axes[1].set_ylabel('Velocity (rad/s)')
+axes[1].set_title('Joint Velocities')
+axes[1].legend()
+axes[1].grid(True)
 
-# # Plot torques
-# for i in range(6):
-#     axes[2].plot(time_data, torque_data[:, i], label=joint_names[i])
-# axes[2].set_xlabel('Time (s)')
-# axes[2].set_ylabel('Torque (Nm)')
-# axes[2].set_title('Joint Torques')
-# axes[2].legend()
-# axes[2].grid(True)
+# Plot torques
+for i in range(6):
+    axes[2].plot(time_data, torque_data[:, i], label=joint_names[i])
+axes[2].set_xlabel('Time (s)')
+axes[2].set_ylabel('Torque (Nm)')
+axes[2].set_title('Joint Torques')
+axes[2].legend()
+axes[2].grid(True)
 
-# plt.tight_layout()
+plt.tight_layout()
 
-# # compare filtered and unfiltered velocity
-# plt.figure()
-# for i in range(6):
-#     plt.plot(time_data, dq_feb_data[:, i], label=f'Joint {i+1} Unfiltered', linestyle='--')
-#     plt.plot(time_data, dq_feb_data_filted[:, i], label=f'Joint {i+1} Filtered', linestyle='-')
-#     plt.title(f'Joint {i+1} Velocity Comparison')
-#     plt.xlabel('Time (s)')
-#     plt.ylabel('Velocity (rad/s)')
-#     plt.legend()
-#     plt.grid()
-# plt.tight_layout()
+# compare filtered and unfiltered velocity
+plt.figure()
+for i in range(6):
+    plt.plot(time_data, dq_feb_data[:, i], label=f'Joint {i+1} Unfiltered', linestyle='--')
+    plt.plot(time_data, dq_feb_data_filted[:, i], label=f'Joint {i+1} Filtered', linestyle='-')
+    plt.title(f'Joint {i+1} Velocity Comparison')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Velocity (rad/s)')
+    plt.legend()
+    plt.grid()
+plt.tight_layout()
 
-# # plot the acceleration data to check
-# plt.figure()
-# for i in range(6):
-#     plt.plot(time_data, ddq_feb_data[:, i], label=f'Joint {i+1} Acceleration')
-#     plt.title(f'Joint {i+1} Acceleration')
-#     plt.xlabel('Time (s)')
-#     plt.ylabel('Acceleration (rad/s²)')
-#     plt.legend()
-#     plt.grid()
-# plt.tight_layout()
+# plot the acceleration data to check
+plt.figure()
+for i in range(6):
+    plt.plot(time_data, ddq_feb_data[:, i], label=f'Joint {i+1} Acceleration')
+    plt.title(f'Joint {i+1} Acceleration')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Acceleration (rad/s²)')
+    plt.legend()
+    plt.grid()
+plt.tight_layout()
 
-# # compare measured torque and mujoco_inverse_dynamics
-# plt.figure()
-# # compare torque at left hip pitch (joint 0 in new order)
-# joint_idx = 0
-# plt.plot(time_data, torque_data[:, joint_idx], label='Measured Torque', linestyle='--')
-# plt.plot(time_data, torque_id_data[:, joint_idx], label='mujoco_inverse_dynamics', linestyle='-')
-# plt.title(f'Left Hip Pitch Torque Comparison')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Torque (Nm)')
-# plt.legend()
-# plt.grid()
-# plt.tight_layout()
+# compare measured torque and mujoco_inverse_dynamics
+plt.figure()
+# compare torque at left hip pitch (joint 0 in new order)
+joint_idx = 0
+plt.plot(time_data, torque_data[:, joint_idx], label='Measured Torque', linestyle='--')
+plt.plot(time_data, torque_id_data[:, joint_idx], label='mujoco_inverse_dynamics', linestyle='-')
+plt.title(f'Left Hip Pitch Torque Comparison')
+plt.xlabel('Time (s)')
+plt.ylabel('Torque (Nm)')
+plt.legend()
+plt.grid()
+plt.tight_layout()
 
-# # compare torque at left left_hip_roll (joint 1 in new order)
-# plt.figure()
-# joint_idx = 1
-# plt.plot(time_data, torque_data[:, joint_idx], label='Measured Torque', linestyle='--')
-# plt.plot(time_data, torque_id_data[:, joint_idx], label='mujoco_inverse_dynamics', linestyle='-')
-# plt.title(f'Left Hip Roll Torque Comparison')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Torque (Nm)')
-# plt.legend()
-# plt.grid()
-# plt.tight_layout()
+# compare torque at left left_hip_roll (joint 1 in new order)
+plt.figure()
+joint_idx = 1
+plt.plot(time_data, torque_data[:, joint_idx], label='Measured Torque', linestyle='--')
+plt.plot(time_data, torque_id_data[:, joint_idx], label='mujoco_inverse_dynamics', linestyle='-')
+plt.title(f'Left Hip Roll Torque Comparison')
+plt.xlabel('Time (s)')
+plt.ylabel('Torque (Nm)')
+plt.legend()
+plt.grid()
+plt.tight_layout()
 
-# # compare torque at left left_hip_yaw (joint 2 in new order)
-# plt.figure()
-# joint_idx = 2
-# plt.plot(time_data, -torque_data[:, joint_idx], label='Measured Torque', linestyle='--')
-# plt.plot(time_data, torque_id_data[:, joint_idx], label='mujoco_inverse_dynamics', linestyle='-')
-# plt.title(f'Left Hip Yaw Torque Comparison')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Torque (Nm)')
-# plt.legend()
-# plt.grid()
-# plt.tight_layout()
+# compare torque at left left_hip_yaw (joint 2 in new order)
+plt.figure()
+joint_idx = 2
+plt.plot(time_data, -torque_data[:, joint_idx], label='Measured Torque', linestyle='--')
+plt.plot(time_data, torque_id_data[:, joint_idx], label='mujoco_inverse_dynamics', linestyle='-')
+plt.title(f'Left Hip Yaw Torque Comparison')
+plt.xlabel('Time (s)')
+plt.ylabel('Torque (Nm)')
+plt.legend()
+plt.grid()
+plt.tight_layout()
 
 # compare torque at left knee (joint 3 in new order)
 plt.figure()
